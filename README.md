@@ -2,11 +2,9 @@
 
 Build a Junior Astronaut Mission Trainer ,Space-themed STEM content often oversimplifies the engineering trade-offs that define a real mission or presents them at a level too complex to hold a young learner's attention. Few tools make those trade-offs both tangible and fun. Your challenge is to design and build an interactive game or app that lets students run a lunar or Martian outpost, balancing competing demands like life support, radiation shielding, power, and food production, so they experience firsthand the decisions that determine whether a mission fails or succeeds.
 
-This project was built with [Lovable](https://lovable.dev).
-
 **Live app**: https://lunar-outpost-odyssey.lovable.app
 
-## Build with Lovable
+## Build 
 
 Continue developing this project in the [Lovable editor](https://lovable.dev/projects/22e6db3d-5dc2-4791-9c52-516cb9f894b4).
 
