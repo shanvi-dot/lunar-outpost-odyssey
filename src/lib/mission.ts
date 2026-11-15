@@ -40,7 +40,11 @@ function shuffled<T>(items: T[], random: () => number): T[] {
   const result = [...items];
   for (let i = result.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
+    const left = result[i];
+    const right = result[j];
+    if (left === undefined || right === undefined) continue;
+    result[i] = right;
+    result[j] = left;
   }
   return result;
 }

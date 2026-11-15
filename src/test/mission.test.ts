@@ -43,7 +43,7 @@ describe("Lunar Outpost rules", () => {
     expect(result.levels.life).toBe(82);
     expect(result.levels.food).toBe(88);
     expect(result.levels.power).toBe(49);
-    expect(result.history[0].lowPower).toBe(true);
+    expect(result.history[0]?.lowPower).toBe(true);
   });
   it("does not couple systems when post-decay power is exactly 30", () => {
     const result = advanceSol({ ...quietMission(), levels: { life: 80, shield: 80, power: 40, food: 80 } }, balanced);
@@ -52,7 +52,7 @@ describe("Lunar Outpost rules", () => {
   });
   it("lunar night costs 15 extra power", () => {
     const state = quietMission();
-    state.schedule[0].lunarNight = true;
+    state.schedule[0] = { event: null, lunarNight: true };
     expect(dayPreparation(state).levels.power).toBe(55);
   });
   it.each(["life", "food"] as const)("%s below 25 costs 10 crew health", (id) => {
@@ -71,16 +71,16 @@ describe("Lunar Outpost rules", () => {
   });
   it("radiation is intensity times 12 minus final shield times 0.12", () => {
     const state = quietMission();
-    state.schedule[0].event = { date: "2026-01-01", type: "flare", classType: "X1.2", intensity: 3, source: "NASA DONKI" };
+    state.schedule[0] = { lunarNight: false, event: { date: "2026-01-01", type: "flare", classType: "X1.2", intensity: 3, source: "NASA DONKI" } };
     const result = advanceSol(state, balanced);
-    expect(result.history[0].radiationDamage).toBeCloseTo(36 - 97 * 0.12);
+    expect(result.history[0]?.radiationDamage).toBeCloseTo(36 - 97 * 0.12);
     expect(result.crewHealth).toBeCloseTo(100 - (36 - 97 * 0.12));
   });
   it("radiation has a zero minimum", () => {
     const state = quietMission();
-    state.schedule[0].event = { ...SPACE_WEATHER_EVENTS[0], intensity: 1 };
+    state.schedule[0] = { lunarNight: false, event: { date: "2026-01-01", type: "flare", classType: "C1.0", intensity: 1, source: "NASA DONKI" } };
     const result = advanceSol(state, { life: 4, shield: 6, power: 5, food: 5 });
-    expect(result.history[0].radiationDamage).toBe(0);
+    expect(result.history[0]?.radiationDamage).toBe(0);
     expect(result.crewHealth).toBe(100);
   });
   it("creates six days with exactly one quiet day and one lunar night", () => {
