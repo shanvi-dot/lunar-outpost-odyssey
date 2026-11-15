@@ -1,0 +1,22 @@
+// All mission balance values live here. Weather intensity belongs to the data rows.
+export const GAME_CONFIG = {
+  days: 6,
+  dailyBudget: 20,
+  systemMin: 0,
+  systemMax: 100,
+  startingSystem: 80,
+  startingHealth: 100,
+  startingAllocation: 0,
+  decay: { life: 8, shield: 3, power: 10, food: 7 },
+  unitGain: 4,
+  lowPowerThreshold: 30,
+  lowPowerLifeMultiplier: 0.5,
+  lowPowerFoodLoss: 5,
+  lunarNightPowerLoss: 15,
+  needsThreshold: 25,
+  needsHealthLoss: 10,
+  radiationPerIntensity: 12,
+  shieldRadiationReduction: 0.12,
+  quietDays: 1,
+  lunarNights: 1,
+} as const;
