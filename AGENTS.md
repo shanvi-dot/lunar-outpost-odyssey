@@ -32,3 +32,5 @@ use the editor.
 ## Mission simulation
 
 - Keep the outpost simulation rules in a pure, separately testable frontend module so the game UI can present deterministic outcomes.
+- Keep balance constants in `src/game/config.ts` and replaceable weather rows in `src/data/events.ts`; generate the mission schedule in the browser and pass it into the pure simulation for repeatable tests without a backend.
+- Resolve days in order: decay and lunar night, check low power, allocate supplies, apply low-power crop loss, then needs and radiation damage; low-power effects use the pre-allocation power level so same-day repairs cannot erase an existing outage.
