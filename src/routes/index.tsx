@@ -1,44 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  ArrowDownRight,
-  ArrowUpRight,
-  Check,
-  ChevronRight,
-  CircleHelp,
-  Heart,
-  Leaf,
-  Minus,
-  Moon,
-  Plus,
-  Radio,
-  RotateCcw,
-  Shield,
-  Sparkles,
-  Sun,
-  Users,
-  Wind,
-  Zap,
-} from "lucide-react";
-
+import { Check, ChevronRight, CircleHelp, Heart, Leaf, Minus, Moon, Plus, Radio, Shield, Sparkles, Sun, Users, Wind, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MissionResults } from "@/components/mission-results";
 import lunarOutpost from "@/assets/lunar-outpost.jpg";
-import {
-  advanceSol,
-  allocationTotal,
-  canAdvance,
-  DAILY_SUPPLY_BUDGET,
-  DEFAULT_ALLOCATION,
-  INITIAL_MISSION,
-  MISSION_LENGTH,
-  missionScore,
-  SOL_EVENTS,
-  SYSTEMS,
-  type Allocation,
-  type MissionState,
-  type SystemId,
-} from "@/lib/mission";
-
+import { GAME_CONFIG as C } from "@/game/config";
+import { advanceSol, allocationTotal, canAdvance, createMission, dayPreparation, DEFAULT_ALLOCATION, formatNumber, MISSION_LENGTH, SYSTEMS, type Allocation, type MissionState, type SystemId } from "@/lib/mission";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -61,32 +28,34 @@ const SYSTEM_DETAILS: Record<SystemId, { icon: typeof Wind; explanation: string;
 };
 
 function MissionTrainer() {
-  const [mission, setMission] = useState<MissionState>(INITIAL_MISSION);
-  const [allocation, setAllocation] = useState<Allocation>(DEFAULT_ALLOCATION);
-  const remaining = DAILY_SUPPLY_BUDGET - allocationTotal(allocation);
-  const currentEvent = SOL_EVENTS[Math.min(mission.sol - 1, MISSION_LENGTH - 1)];
-
-  function changeAllocation(system: SystemId, amount: number) {
+  const [mission, setMission] = useState<MissionState | null>(null);
+  const [allocation, setAllocation] = useState<Allocation>({ ...DEFAULT_ALLOCATION });
+  const [screen, setScreen] = useState<"plan" | "results" | "final">("plan");
+  useEffect(() => { setMission(createMission()); }, []);
+  if (!mission) return <main className="flex min-h-screen items-center justify-center bg-background text-primary">Preparing your lunar mission…</main>;
+  const remaining = C.dailyBudget - allocationTotal(allocation);
+  const today = mission.schedule[mission.sol - 1];
+  const event = today?.event;
+  const prepared = dayPreparation(mission);
+  function changeAllocation(id: SystemId, amount: number) {
     setAllocation((current) => {
-      if (amount > 0 && allocationTotal(current) >= DAILY_SUPPLY_BUDGET) return current;
-      if (amount < 0 && current[system] <= 0) return current;
-      return { ...current, [system]: current[system] + amount };
+      if ((amount > 0 && allocationTotal(current) >= C.dailyBudget) || current[id] + amount < C.startingAllocation) return current;
+      return { ...current, [id]: current[id] + amount };
     });
   }
-
-  function runSol() {
-    if (!canAdvance(allocation) || mission.ended) return;
-    setMission((current) => advanceSol(current, allocation));
-    setAllocation(DEFAULT_ALLOCATION);
+  function runDay() {
+    if (!canAdvance(allocation)) return;
+    setMission((current) => current ? advanceSol(current, allocation) : current);
+    setAllocation({ ...DEFAULT_ALLOCATION });
+    setScreen("results");
   }
-
-  function restart() {
-    setMission(INITIAL_MISSION);
-    setAllocation(DEFAULT_ALLOCATION);
+  function replay() {
+    setMission(createMission());
+    setAllocation({ ...DEFAULT_ALLOCATION });
+    setScreen("plan");
+    document.getElementById("decision-desk")?.scrollIntoView({ block: "start" });
   }
-
-  return (
-    <main className="min-h-screen bg-background text-foreground">
+  return <main className="min-h-screen bg-background text-foreground">
       <header className="border-b border-mission-line bg-background">
         <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-8">
           <a href="#mission" className="flex min-w-0 items-center gap-3" aria-label="Junior Astronaut Mission Trainer home">
@@ -100,7 +69,7 @@ function MissionTrainer() {
           </a>
           <div className="hidden items-center gap-2 font-mono text-[11px] uppercase text-mission-muted sm:flex">
             <span className="size-2 animate-pulse rounded-full bg-food" />
-            Mission in progress
+            {mission.ended ? "Mission report" : "Mission in progress"}
           </div>
           <div className="flex items-center gap-2 font-mono text-xs text-mission-muted">
             <Users size={15} className="text-primary" aria-hidden="true" />
@@ -125,7 +94,7 @@ function MissionTrainer() {
               Six lunar days. Four astronauts. Every supply choice has a trade-off. Can you get the whole crew home safe?
             </p>
             <div className="mt-5 flex flex-wrap gap-2 font-mono text-[10px] uppercase">
-              <span className="border border-mission-line bg-background/75 px-2.5 py-1.5 text-mission-ink">SOL {String(Math.min(mission.sol, MISSION_LENGTH)).padStart(2, "0")} / 06</span>
+              <span className="border border-mission-line bg-background/75 px-2.5 py-1.5 text-mission-ink">DAY {String(mission.sol).padStart(2, "0")} / {MISSION_LENGTH}</span>
               <span className="border border-mission-line bg-background/75 px-2.5 py-1.5 text-mission-muted">MOON BASE · 2035</span>
               <span className="border border-food/40 bg-background/75 px-2.5 py-1.5 text-food">4 CREW ON BOARD</span>
             </div>
@@ -136,139 +105,42 @@ function MissionTrainer() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1440px] px-4 py-6 sm:px-8 sm:py-8">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-mission-muted">Flight control <span className="px-1 text-primary">/</span> decision desk</p>
-            <h2 className="mt-1 font-display text-2xl font-semibold">Sol {Math.min(mission.sol, MISSION_LENGTH)} <span className="text-mission-muted">of {MISSION_LENGTH}</span></h2>
-          </div>
-          <div className="flex items-center gap-3 border border-mission-line bg-mission-panel px-3 py-2.5">
-            <div className="flex size-8 items-center justify-center border border-primary/30 bg-primary/10 text-primary"><Sparkles size={16} /></div>
-            <div>
-              <p className="font-mono text-[9px] uppercase text-mission-muted">Today’s cargo budget</p>
-              <p className="font-display text-base font-semibold"><span className="text-primary">{remaining}</span><span className="text-mission-muted"> / {DAILY_SUPPLY_BUDGET} units left</span></p>
-            </div>
-          </div>
-        </div>
 
+    <section id="decision-desk" className="mx-auto max-w-[1440px] px-4 py-6 sm:px-8 sm:py-8">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+        <div><p className="font-mono text-[10px] uppercase text-mission-muted">Flight control / decision desk</p><h2 className="mt-1 font-display text-2xl font-semibold">Day {mission.sol} <span className="text-mission-muted">of {C.days}</span></h2></div>
+        {screen === "plan" && <div className="flex items-center gap-3 border border-mission-line bg-mission-panel px-3 py-2.5"><Sparkles size={18} className="text-primary" /><div><p className="font-mono text-[9px] uppercase text-mission-muted">Today’s cargo budget</p><p className="font-display font-semibold"><span className="text-primary">{remaining}</span><span className="text-mission-muted"> / {C.dailyBudget} units left</span></p></div></div>}
+      </div>
+      {screen !== "plan" ? <MissionResults mission={mission} final={screen === "final"} onReplay={replay} onContinue={() => { setScreen(mission.ended ? "final" : "plan"); document.getElementById("decision-desk")?.scrollIntoView({ block: "start" }); }} /> : <>
+        <div className="mb-5 border border-primary/35 bg-primary/5 p-4" aria-label="Space weather forecast">
+          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="flex items-center gap-2 font-display font-semibold"><Sun size={18} className="text-primary" />Space weather forecast</h3><span className="font-mono text-[10px] uppercase text-mission-muted">Day {mission.sol} · Placeholder data</span></div>
+          <p className="mt-3 font-display font-semibold">{event ? event.type === "flare" ? "Solar flare — a flash of energy from the Sun" : "Solar cloud — a burst of particles from the Sun" : "Quiet Sun — no radiation damage today"}</p>
+          {event && <p className="mt-1 break-words font-mono text-xs leading-6 text-mission-muted">{event.date} · {event.type.toUpperCase()} · Class {event.classType} · Intensity {event.intensity}/3 · {event.source}</p>}
+          <p className="mt-2 text-sm leading-6 text-mission-muted">{event ? `This event brings ${event.intensity * C.radiationPerIntensity} radiation points. Each shield point blocks ${C.shieldRadiationReduction}. More shielding means less crew health lost.` : "You can give other systems more supplies, but your shield still wears down."}</p>
+          {today?.lunarNight && <p className="mt-3 text-sm font-semibold text-primary">Lunar night today: solar panels are dark. Power loses {C.lunarNightPowerLoss} extra points.</p>}
+          {prepared.lowPower && <p className="mt-3 text-sm font-semibold text-destructive">Power is below {C.lowPowerThreshold}: Life supplies give only {C.unitGain * C.lowPowerLifeMultiplier} points each today, and Food loses {C.lowPowerFoodLoss} extra points.</p>}
+        </div>
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(300px,0.85fr)]">
           <div className="min-w-0 border border-mission-line bg-mission-panel">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-mission-line px-4 py-3 sm:px-5">
-              <div>
-                <h3 className="font-display text-base font-semibold">Allocate today’s supplies</h3>
-                <p className="mt-0.5 text-xs text-mission-muted">Use all {DAILY_SUPPLY_BUDGET} units before the next sol.</p>
-              </div>
-              <span className={`flex items-center gap-1.5 font-mono text-[10px] uppercase ${remaining === 0 ? "text-food" : "text-primary"}`}>
-                {remaining === 0 ? <Check size={13} /> : <CircleHelp size={13} />}
-                {remaining === 0 ? "Ready to deploy" : `${remaining} to assign`}
-              </span>
-            </div>
-
-            <div className="divide-y divide-mission-line">
-              {SYSTEMS.map((system) => {
-                const detail = SYSTEM_DETAILS[system.id];
-                const Icon = detail.icon;
-                return (
-                  <div key={system.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_112px_118px] sm:gap-5 sm:px-5">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className={`flex size-10 shrink-0 items-center justify-center border border-current/20 bg-mission-panel-raised ${detail.colorClass}`}><Icon size={19} /></div>
-                      <div className="min-w-0">
-                        <p className="truncate font-display text-sm font-semibold">{system.label}</p>
-                        <p className="truncate text-xs text-mission-muted">{detail.explanation}</p>
-                      </div>
-                    </div>
-                    <div className="order-3 col-span-2 flex items-center gap-3 sm:order-none sm:col-span-1 sm:block">
-                      <progress className={`status-meter ${detail.meterClass}`} value={mission.levels[system.id]} max={100} aria-label={`${system.label} status ${mission.levels[system.id]} percent`} />
-                      <span className="shrink-0 font-mono text-xs text-mission-muted sm:mt-1 sm:block">{mission.levels[system.id]}%</span>
-                    </div>
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="outline" size="icon" className="size-9 rounded-sm border-mission-line bg-mission-panel-raised" aria-label={`Use one fewer supply unit for ${system.label}`} disabled={mission.ended || allocation[system.id] === 0} onClick={() => changeAllocation(system.id, -1)}><Minus size={15} /></Button>
-                      <span className="w-6 text-center font-mono text-base tabular-nums">{allocation[system.id]}</span>
-                      <Button variant="outline" size="icon" className="size-9 rounded-sm border-mission-line bg-mission-panel-raised" aria-label={`Use one more supply unit for ${system.label}`} disabled={mission.ended || remaining === 0} onClick={() => changeAllocation(system.id, 1)}><Plus size={15} /></Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-mission-line px-4 py-4 sm:px-5">
-              <div className="flex items-center gap-2 text-xs text-mission-muted">
-                <CircleHelp size={15} className="shrink-0 text-primary" />
-                {remaining === 0 ? "Balanced. Let’s see how the crew fares." : `Assign ${remaining} more ${remaining === 1 ? "unit" : "units"} to continue.`}
-              </div>
-              {mission.ended ? (
-                <Button onClick={restart} className="h-11 w-full rounded-sm px-5 font-display font-semibold sm:w-auto"><RotateCcw size={16} />Start a new mission</Button>
-              ) : (
-                <Button onClick={runSol} disabled={!canAdvance(allocation)} className="h-11 w-full rounded-sm px-5 font-display font-semibold sm:w-auto">Advance to next sol<ChevronRight size={17} /></Button>
-              )}
-            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-mission-line px-4 py-3 sm:px-5"><div><h3 className="font-display font-semibold">Allocate today’s supplies</h3><p className="mt-1 text-xs leading-5 text-mission-muted">Each unit adds {C.unitGain} points. Spend all {C.dailyBudget} to run today.</p></div><span className="flex items-center gap-1.5 font-mono text-[10px] uppercase text-primary">{remaining === 0 && <Check size={13} />}{remaining === 0 ? "Ready to deploy" : `${remaining} to assign`}</span></div>
+            <div className="divide-y divide-mission-line">{SYSTEMS.map((system) => {
+              const detail = SYSTEM_DETAILS[system.id]; const Icon = detail.icon;
+              return <div key={system.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_100px_118px] sm:gap-4 sm:px-5">
+                <div className="flex min-w-0 items-center gap-3"><div className={`flex size-10 shrink-0 items-center justify-center border border-current/20 bg-mission-panel-raised ${detail.colorClass}`}><Icon size={19} /></div><div className="min-w-0"><p className="font-display text-sm font-semibold">{system.label}</p><p className="text-[10px] leading-5 text-mission-muted">Daily use: −{C.decay[system.id]} points</p></div></div>
+                <div className="order-3 col-span-2 flex items-center gap-3 sm:order-none sm:col-span-1 sm:block"><progress className={`status-meter ${detail.meterClass}`} value={prepared.levels[system.id]} max={C.systemMax} aria-label={`${system.label} status ${prepared.levels[system.id]} percent`} /><span className="shrink-0 font-mono text-xs text-mission-muted sm:mt-1 sm:block">{prepared.levels[system.id]}%</span></div>
+                <div className="flex items-center justify-end gap-2"><Button variant="outline" size="icon" className="size-9 rounded-sm border-mission-line bg-mission-panel-raised" aria-label={`Use one fewer supply unit for ${system.label}`} disabled={allocation[system.id] === 0} onClick={() => changeAllocation(system.id, -1)}><Minus size={15} /></Button><span className="w-6 text-center font-mono text-base tabular-nums" aria-label={`${system.label} allocated units`}>{allocation[system.id]}</span><Button variant="outline" size="icon" className="size-9 rounded-sm border-mission-line bg-mission-panel-raised" aria-label={`Use one more supply unit for ${system.label}`} disabled={remaining === 0} onClick={() => changeAllocation(system.id, 1)}><Plus size={15} /></Button></div>
+              </div>;
+            })}</div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-mission-line px-4 py-4 sm:px-5"><p className="text-xs text-mission-muted">{remaining === 0 ? "All supplies assigned. Ready for today." : `Assign ${remaining} more units to continue.`}</p><Button onClick={runDay} disabled={!canAdvance(allocation)} className="h-11 w-full rounded-sm px-5 font-display font-semibold sm:w-auto">Run day {mission.sol}<ChevronRight size={17} /></Button></div>
           </div>
-
           <aside className="space-y-5">
-            <div className="border border-mission-line bg-mission-panel">
-              <div className="flex items-center justify-between border-b border-mission-line px-4 py-3">
-                <h3 className="font-display text-sm font-semibold">Crew & systems</h3>
-                <span className="font-mono text-[9px] uppercase text-mission-muted">Vitals monitor</span>
-              </div>
-              <div className="p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm"><Heart size={15} className="text-destructive" /><span>Crew health</span></div>
-                  <span className="font-mono text-sm">{mission.crewHealth}<span className="text-mission-muted">%</span></span>
-                </div>
-                <progress className="status-meter" value={mission.crewHealth} max={100} aria-label={`Crew health ${mission.crewHealth} percent`} />
-                <div className="mt-4 grid grid-cols-3 gap-2 border-t border-mission-line pt-4 text-center">
-                  <div><p className="font-mono text-base">04</p><p className="mt-0.5 text-[10px] text-mission-muted">ASTRONAUTS</p></div>
-                  <div className="border-x border-mission-line"><p className="font-mono text-base">{Math.max(0, MISSION_LENGTH - mission.sol + (mission.ended ? 0 : 1))}</p><p className="mt-0.5 text-[10px] text-mission-muted">SOLS LEFT</p></div>
-                  <div><p className="flex items-center justify-center gap-1 font-mono text-base"><Radio size={13} className="text-food" /> OK</p><p className="mt-0.5 text-[10px] text-mission-muted">COMMS</p></div>
-                </div>
-              </div>
-            </div>
-
-            {mission.ended ? (
-              <div className={`border p-4 ${mission.success ? "border-food/40 bg-food/5" : "border-destructive/40 bg-destructive/5"}`} role="status" aria-live="polite">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className={`font-mono text-[10px] uppercase ${mission.success ? "text-food" : "text-destructive"}`}>{mission.success ? "Mission complete" : "Mission ended early"}</p>
-                    <h3 className="mt-1 font-display text-xl font-bold">{mission.success ? "Crew coming home!" : "Outpost needs help."}</h3>
-                  </div>
-                  <div className="text-right"><p className="font-mono text-xl text-primary">{missionScore(mission)}</p><p className="text-[9px] text-mission-muted">OUTPOST SCORE</p></div>
-                </div>
-                <p className="mt-3 text-sm leading-5 text-mission-muted">
-                  {mission.success ? "You kept the crew safe through six lunar days. Strong outposts balance everyday needs and prepare for the unexpected." : "A critical system ran too low. In space, life support and radiation shielding protect the crew, so they need steady attention."}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-mission-muted">
-                  {mission.history.map((event, index) => <span key={`${event.title}-${index}`} className="border border-mission-line px-2 py-1">SOL {index + 1}: {event.title}</span>)}
-                </div>
-              </div>
-            ) : (
-              <div className="border border-primary/35 bg-primary/5">
-                <div className="flex items-center gap-2 border-b border-primary/20 px-4 py-3">
-                  <div className="flex size-7 items-center justify-center bg-primary/10 text-primary"><Sun size={15} /></div>
-                  <div><p className="font-mono text-[9px] uppercase text-primary">Mission update · Sol {mission.sol}</p><p className="font-display text-sm font-semibold">{currentEvent?.title}</p></div>
-                  <span className="ml-auto font-mono text-[9px] text-mission-muted">INCOMING</span>
-                </div>
-                <div className="px-4 py-3">
-                  <p className="text-sm leading-5 text-mission-muted">{currentEvent?.detail}</p>
-                  <div className="mt-3 flex items-start gap-2 border-t border-mission-line pt-3 text-xs leading-5 text-mission-ink/85">
-                    {mission.history.length > 0 ? <ArrowDownRight size={15} className="mt-0.5 shrink-0 text-primary" /> : <ArrowUpRight size={15} className="mt-0.5 shrink-0 text-primary" />}
-                    <span>{mission.history.length > 0 ? "Every sol brings a new challenge. Your choices shape the next one." : "Tip: Each extra unit boosts one system, but has to come from somewhere else."}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="border-t border-mission-line pt-3 text-xs leading-5 text-mission-muted">
-              <div className="flex gap-2"><CircleHelp size={15} className="mt-0.5 shrink-0 text-primary" /><p><span className="font-semibold text-mission-ink">Mission science:</span> The Moon has no thick atmosphere or magnetic shield. Habitats need reliable power, recycled air and water, radiation cover, and fresh food.</p></div>
-            </div>
+            <div className="border border-mission-line bg-mission-panel"><div className="border-b border-mission-line px-4 py-3"><h3 className="font-display text-sm font-semibold">Crew & systems</h3></div><div className="p-4"><div className="mb-4 flex items-center justify-between"><span className="flex items-center gap-2 text-sm"><Heart size={15} className="text-destructive" />Crew health</span><span className="font-mono text-sm">{formatNumber(mission.crewHealth)}%</span></div><progress className="status-meter" value={mission.crewHealth} max={C.startingHealth} aria-label={`Crew health ${formatNumber(mission.crewHealth)} percent`} /><div className="mt-4 grid grid-cols-3 gap-2 border-t border-mission-line pt-4 text-center"><div><p className="font-mono text-base">04</p><p className="text-[10px] text-mission-muted">ASTRONAUTS</p></div><div className="border-x border-mission-line"><p className="font-mono text-base">{C.days - mission.history.length}</p><p className="text-[10px] text-mission-muted">DAYS LEFT</p></div><div><p className="flex items-center justify-center gap-1 font-mono text-base"><Radio size={13} className="text-food" />OK</p><p className="text-[10px] text-mission-muted">COMMS</p></div></div></div></div>
+            <div className="border-y border-mission-line py-4"><h3 className="font-display text-sm font-semibold">Today’s trade-offs</h3><p className="mt-2 text-sm leading-6 text-mission-muted">The meters show levels after daily use. Supplies refill them, up to {C.systemMax}. Full systems waste extra supplies.</p><p className="mt-2 text-sm leading-6 text-mission-muted">Air or food below {C.needsThreshold} costs {C.needsHealthLoss} crew health. Your shield blocks radiation after supplies are added.</p><p className="mt-2 text-sm leading-6 text-mission-muted">Power below {C.lowPowerThreshold} makes air repairs weaker today, even if you refill power.</p></div>
+            <div className="flex gap-2 text-xs leading-5 text-mission-muted"><CircleHelp size={15} className="mt-1 shrink-0 text-primary" /><p>The Moon has no thick air or magnetic shield. Our crew needs power, recycled air and water, radiation cover, and fresh food.</p></div>
           </aside>
         </div>
-
-        <div className="mt-6 flex items-center justify-between border-t border-mission-line pt-4 font-mono text-[9px] uppercase text-mission-muted">
-          <span className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-food" />All systems nominal</span>
-          <span className="hidden sm:block">Mission control · Earth ↔ Moon · 384,400 km</span>
-          <span>TRAINING SIM · V1.0</span>
-        </div>
-      </section>
-    </main>
-  );
+      </>}
+      <footer className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-mission-line pt-4 font-mono text-[9px] uppercase text-mission-muted"><span className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-food" />{mission.ended ? "Mission report ready" : "Mission control online"}</span><span>Space weather data: NASA DONKI</span><span>TRAINING SIM</span></footer>
+    </section>
+  </main>;
 }
